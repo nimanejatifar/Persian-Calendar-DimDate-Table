@@ -1,0 +1,31 @@
+let ShamsiDate = (Start.Date as date, optional End.Date as date) as table => let
+    
+    StartDate =  Start.Date,
+    EndDate = if End.Date = null then DateTime.Date(DateTime.LocalNow()) else End.Date,
+    NumberOfDays = Duration.Days( EndDate - StartDate )+1,
+    Dates = List.Dates(StartDate, NumberOfDays, #duration(1,0,0,0)),
+    CTTable = Table.FromList(Dates, Splitter.SplitByNothing(), null, null, ExtraValues.Error),
+    DateName = Table.RenameColumns(CTTable,{{"Column1", "Date"}}),
+    DateFormat = Table.TransformColumnTypes(DateName,{{"Date", type date}}),
+    ShamsiDate = Table.AddColumn(DateFormat, "Shamsi Date", each Date.ToText([Date],"yyyy-MM-dd","fa-IR")),
+    ShamiDateN = Table.AddColumn(ShamsiDate,"Shamsi Date Number", each Text.Remove([Shamsi Date], {"-"})),
+    ShamiDateN1 = Table.TransformColumnTypes(ShamiDateN,{{"Shamsi Date Number", Int64.Type}}),
+    ShamsiYear = Table.AddColumn(ShamiDateN1, "Shamsi Year", each Number.FromText(Text.Start([Shamsi Date],4)), Int64.Type),
+    ShamsiMonth = Table.AddColumn(ShamsiYear, "Shamsi Month", each Number.FromText(Text.End(Text.Start([Shamsi Date],7),2)),Int64.Type),
+    ShamsiDay = Table.AddColumn(ShamsiMonth, "Shamsi Day", each Text.End([Shamsi Date],2)),
+    ShamsiDay1 = Table.TransformColumnTypes(ShamsiDay,{{"Shamsi Day", Int64.Type}}),
+    ShamsiMName = Table.AddColumn(ShamsiDay1, "Shamsi Month Name", each Date.ToText([Date],"MMMM","fa-IR"), type text),
+    ShamsiDayName = Table.AddColumn(ShamsiMName, "Shamsi Day Name", each Date.ToText([Date],"dddd","fa-IR"), type text),
+    MMYY = Table.AddColumn(ShamsiDayName, "YYYY-MM", each Text.BeforeDelimiter([Shamsi Date], "-", 1), type text),
+    HalfYear = Table.AddColumn(MMYY, "NimSal", each if [Shamsi Month]<=6 then "نیمه اول سال" else "نیمه دوم سال", type text),
+    SeasonName = Table.AddColumn(HalfYear, "Season Name", each if List.Contains({1, 2, 3}, [Shamsi Month]) then "بهار" else if List.Contains({4, 5, 6}, [Shamsi Month]) then "تابستان" else if List.Contains({7, 8, 9}, [Shamsi Month]) then "پاییز" else "زمستان" , type text),
+    QuarterNumber = Table.AddColumn(HalfYear, "Shamsi Quarter Number", each if List.Contains({1, 2, 3}, [Shamsi Month]) then 1 else if List.Contains({4, 5, 6}, [Shamsi Month]) then 2 else if List.Contains({7, 8, 9}, [Shamsi Month]) then 3 else 4,Int64.Type ),
+    DayofYear = Table.AddColumn(QuarterNumber, "Shamsi Day Of Year", each if Date.DayOfYear([Date])>=80 then Date.DayOfYear([Date])-79 else Date.DayOfYear([Date])+286,Int64.Type)
+in
+DayofYear, Documentation = [
+   Documentation.Name =  "Persian Calendar",
+   Documentation.LongDescription = "Solar Hijri calendar Table",
+   Documentation.Category = "Table"
+    ] 
+  in 
+   Value.ReplaceType(ShamsiDate, Value.ReplaceMetadata(Value.Type(ShamsiDate), Documentation))
